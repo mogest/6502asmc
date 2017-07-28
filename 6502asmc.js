@@ -193,7 +193,7 @@ function runPass(program, labels, debug) {
       continue;
     }
 
-    const labelMatch = line.match(/^(\w+)\s*\:\s*(.+)/);
+    const labelMatch = line.match(/^([a-z_]\w*)\s*\:\s*(.+)/i);
 
     if (labelMatch) {
       const name = labelMatch[1];
