@@ -2,5 +2,4 @@
 
 A 6502 assembly compiler, written in JavaScript.
 
-This is a hideous implementation, bashed together quickly for reasons.
-It's untested and, frankly, unsanitary.
+A very simple and incomplete implementation, hastely thrown together without tests.

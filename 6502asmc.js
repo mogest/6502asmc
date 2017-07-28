@@ -15,6 +15,21 @@ const MODE_OFFSETS = {
   "zero,y": 11
 };
 
+const MODE_BYTES = {
+  "implied": 1,
+  "accumulator": 1,
+  "immediate": 2,
+  "zero": 2,
+  "zero,x": 2,
+  "zero,y": 2,
+  "absolute": 3,
+  "absolute,x": 3,
+  "absolute,y": 3,
+  "indirect": 3,
+  "indirect,x": 3,
+  "indirect,y": 3,
+};
+
 const BRANCH_OPS = ["BPL", "BMI", "BVC", "BVS", "BCC", "BCS", "BNE", "BEQ"];
 
 const OPS = {
@@ -77,32 +92,47 @@ const OPS = {
   "STY": [null, null, 0x84, 0x94, 0x8c]
 };
 
-function hex(number) {
+function hex(number, padding) {
   let string = number.toString(16);
-  while (string.length < 4) { string = "0" + string; }
+  while (string.length < padding) { string = "0" + string; }
   return string.toUpperCase();
 }
 
 function rightPad(string, count) {
+  string = string === undefined ? "" : string.toString();
   while (string.length < count) { string += " "; }
   return string;
 }
 
-function parseNumber(value, bytes, labels, pc) {
+function formatValue(op, mode, value) {
+  switch (mode) {
+    case "implied":      return "";
+    case "accumulator":  return "A";
+    case "immediate":    return "#$" + hex(value, 2);
+    case "zero":         return "$" + hex(value, 2);
+    case "zero,x":       return "$" + hex(value, 2) + ", X";
+    case "zero,y":       return "$" + hex(value, 2) + ", Y";
+    case "absolute":     return "$" + hex(value, 4);
+    case "absolute,x":   return "$" + hex(value, 4) + ", X";
+    case "absolute,y":   return "$" + hex(value, 4) + ", Y";
+    case "indirect":     return "($" + hex(value, 4) + ")";
+    case "indirect,x":   return "($" + hex(value, 4) + ", X)";
+    case "indirect,y":   return "($" + hex(value, 4) + "), Y";
+  }
+}
+
+function parseNumber(value, bytes) {
   let match;
   let number;
 
   if (match = value.match(/^\$([0-9a-f]+)$/i)) {
     number = parseInt(match[1], 16);
   }
-  else if (match = value.match(/^[0-9]+$/)) {
+  else if (value.match(/^[0-9]+$/)) {
     number = parseInt(value, 10);
   }
-  else if (labels && labels[value]) {
-    number = labels[value];
-  }
-  else if (!labels) {
-    return pc; // first pass we don't really care about matching the label
+  else if (value.match(/^[a-z_]\w*$/i)) {
+    return ["label", value];
   }
   else {
     throw new Error(`unable to parse "${value}" as a number or label`);
@@ -116,10 +146,10 @@ function parseNumber(value, bytes, labels, pc) {
     throw new Error(`number ${number} must be smaller than ${Math.pow(2, bytes*8)}`);
   }
 
-  return number;
+  return ["number", number];
 }
 
-function parse(op, mode, argument, labels, pc) {
+function parse(op, mode, argument, pc) {
   const opValues = OPS[op.toUpperCase()];
   if (opValues === undefined) {
     throw new Error(`unknown op ${op}`);
@@ -137,8 +167,7 @@ function parse(op, mode, argument, labels, pc) {
   }
 
   if (BRANCH_OPS.includes(op)) {
-    const absolute = parseNumber(argument, 2, labels, pc);
-    const diff = absolute - (pc + 2);
+    const diff = argument - (pc + 2);
 
     if (diff < -128 || diff > 127) {
       throw new Error("can only branch within 127 bytes of current location");
@@ -152,109 +181,150 @@ function parse(op, mode, argument, labels, pc) {
     case "accumulator":
       return [value];
     case "immediate":
-      return [value, parseNumber(argument, 1, {})];
+    case "zero":
+    case "zero,x":
+    case "zero,y":
+      return [value, argument];
     case "absolute":
     case "absolute,x":
     case "absolute,y":
-      let absNumber = parseNumber(argument, 2, labels, pc);
-
-      if (absNumber < 256) {
-        const zeroOp = opValues[MODE_OFFSETS[mode.replace("absolute", "zero")]];
-        if (zeroOp !== undefined) {
-          return [zeroOp, absNumber];
-        }
-      }
-
-      return [value, absNumber & 0xff, absNumber >> 8];
-
+    case "indirect":
     case "indirect,x":
     case "indirect,y":
-    case "indirect":
-      const indirectNumber = parseNumber(argument, 2, labels, pc);
-      return [value, indirectNumber & 0xff, indirectNumber >> 8];
+      return [value, argument & 0xff, argument >> 8];
   }
 }
 
-function runPass(program, labels, debug) {
+function parseLine(rawLine, pc, labels) {
+  let line = rawLine.replace(/^\s+|\s+$/g, '');
+
+  if (!line) { return [pc]; }
+
+  const pcSetMatch = line.match(/^\*\s*=\s*(\$?[0-9a-f]+)$/i);
+  if (pcSetMatch) {
+    pc = parseNumber(pcSetMatch[1], 2, {});
+    return [pc];
+  }
+
+  const labelMatch = line.match(/^([a-z_]\w*)\s*\:\s*(.+)/i);
+
+  if (labelMatch) {
+    const name = labelMatch[1];
+    if (name.toUpperCase() === 'A') {
+      throw new Error(`"${name}" is not a valid label because some opcodes take "A" as a parameter, e.g. ROR A`);
+    }
+    if (labels[name]) {
+      throw new Error(`label ${name} was defined more than once`);
+    }
+    labels[name] = pc;
+    line = labelMatch[2];
+  }
+
+  let match, mode;
+
+  if (match = line.match(/^([a-z]{3})$/i)) {
+    mode = 'implied';
+  }
+  else if (match = line.match(/^([a-z]{3})\s+a$/i)) {
+    mode = 'accumulator';
+  }
+  else if (match = line.match(/^([a-z]{3})\s+#([0-9]+|\$[0-9a-f]+)$/i)) {
+    mode = 'immediate';
+  }
+  else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+)$/i)) {
+    mode = 'absolute';
+  }
+  else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+),\s*([xy])$/i)) {
+    mode = 'absolute,' + match[3].toLowerCase();
+  }
+  else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\)$/i)) {
+    mode = 'indirect';
+  }
+  else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+),\s*x\)$/i)) {
+    mode = 'indirect,x';
+  }
+  else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\),\s*y$/i)) {
+    mode = 'indirect,y';
+  }
+
+  if (mode) {
+    const op = match[1], argument = match[2];
+
+    if (argument !== undefined) {
+      const [argType, argValue] = parseNumber(argument, mode === 'immediate' ? 1 : 2);
+
+      if (mode.includes("absolute") && argType === 'number' && argValue < 256) {
+        mode = mode.replace("absolute", "zero");
+      }
+
+      return [pc, op, mode, argType, argValue];
+    }
+    else {
+      return [pc, op, mode];
+    }
+  }
+  else {
+    throw new Error(`could not parse line "${line}"`);
+  }
+}
+
+function runFirstPass(program) {
   const lines = program.split("\n");
 
   let pc = 0xc000;
-  let foundLabels = {};
+  let labels = {};
+  let instructions = [];
+
+  for (const line of lines) {
+    const result = parseLine(line, pc, labels);
+    instructions.push(result);
+
+    pc += BRANCH_OPS.includes(result[1]) ? 2 : (MODE_BYTES[result[2]] || 0);
+  }
+
+  return {instructions, labels};
+}
+
+function resolveValue(argType, argValue, labels) {
+  if (argType) {
+    if (argType === 'label') {
+      const value = labels[argValue];
+      if (value === undefined) {
+        throw new Error(`there is a reference to label "${argValue}" but this label is not defined anywhere`);
+      }
+      return value;
+    }
+    else {
+      return argValue;
+    }
+  }
+}
+
+function runSecondPass({instructions, labels}, debug) {
   let output = [];
 
-  for (const rawLine of lines) {
-    let line = rawLine.replace(/^\s+|\s+$/g, '');
+  for (const instruction of instructions) {
+    const [pc, op, mode, argType, argValue] = instruction;
 
-    if (!line) { continue; }
-
-    const pcSetMatch = line.match(/^\*\s*=\s*(\$?[0-9a-f]+)$/i);
-    if (pcSetMatch) {
-      pc = parseNumber(pcSetMatch[1], 2, {});
-      continue;
-    }
-
-    const labelMatch = line.match(/^([a-z_]\w*)\s*\:\s*(.+)/i);
-
-    if (labelMatch) {
-      const name = labelMatch[1];
-      if (name.toUpperCase() === 'A') {
-        throw new Error(`"${name}" is not a valid label because some opcodes take "A" as a parameter, e.g. ROR A`);
-      }
-      if (foundLabels[name]) {
-        throw new Error(`label ${labelMatch[1]} was defined more than once`);
-      }
-      foundLabels[name] = pc;
-      line = labelMatch[2];
-    }
-
-    let match, mode;
-
-    if (match = line.match(/^([a-z]{3})$/i)) {
-      mode = 'implied';
-    }
-    else if (match = line.match(/^([a-z]{3})\s+a$/i)) {
-      mode = 'accumulator';
-    }
-    else if (match = line.match(/^([a-z]{3})\s+#([0-9]+|\$[0-9a-f]+)$/i)) {
-      mode = 'immediate';
-    }
-    else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+)$/i)) {
-      mode = 'absolute';
-    }
-    else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+),\s*([xy])$/i)) {
-      mode = 'absolute,' + match[3].toLowerCase();
-    }
-    else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\)$/i)) {
-      mode = 'indirect';
-    }
-    else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+),\s*x\)$/i)) {
-      mode = 'indirect,x';
-    }
-    else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\),\s*y$/i)) {
-      mode = 'indirect,y';
-    }
-
-    if (mode) {
-      const result = parse(match[1], mode, match[2], labels, pc);
+    if (op) {
+      const value = resolveValue(argType, argValue, labels);
+      const result = parse(op, mode, value, pc);
 
       if (debug) {
-        console.log("$" + hex(pc) + "  " + rightPad(line, 14) + "   =>", result);
+        let argString = formatValue(op, mode, value);
+        console.log("$" + hex(pc) + "  " + op + " " + rightPad(argString, 10) + "   =>", result);
       }
 
       output = output.concat(result);
-      pc += result.length;
-    }
-    else {
-      throw new Error(`could not parse line "${line}"`);
     }
   }
 
-  return labels ? output : foundLabels;
+  return output;
 }
 
 function compile(program, debug) {
-  const labels = runPass(program, null);
-  return runPass(program, labels, debug);
+  const data = runFirstPass(program);
+  return runSecondPass(data, debug);
 }
 
 module.exports = compile;

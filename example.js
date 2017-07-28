@@ -4,7 +4,7 @@ compile(`
   * = $c000
   LDX #10
   loop: TXA
-  STA $0100, X
+  STA $0400, X
   DEX
   BNE loop
   RTS
@@ -16,11 +16,9 @@ compile(`
   * = $c000
   LDX #10
   loop: TXA
-  STA $0100, X
+  STA $0400, X
   DEX
   BEQ end
   JMP loop
   end: RTS
 `, true);
-
-
