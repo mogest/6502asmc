@@ -193,13 +193,17 @@ function runPass(program, labels, debug) {
       continue;
     }
 
-    const labelMatch = line.match(/^(\w+)\:\s*(.+)/);
+    const labelMatch = line.match(/^(\w+)\s*\:\s*(.+)/);
 
     if (labelMatch) {
-      if (foundLabels[labelMatch[1]]) {
+      const name = labelMatch[1];
+      if (name.toUpperCase() === 'A') {
+        throw new Error(`"${name}" is not a valid label because some opcodes take "A" as a parameter, e.g. ROR A`);
+      }
+      if (foundLabels[name]) {
         throw new Error(`label ${labelMatch[1]} was defined more than once`);
       }
-      foundLabels[labelMatch[1]] = pc;
+      foundLabels[name] = pc;
       line = labelMatch[2];
     }
 
