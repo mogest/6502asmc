@@ -312,7 +312,7 @@ function runSecondPass({instructions, labels}, debug) {
 
       if (debug) {
         let argString = formatValue(op, mode, value);
-        console.log("$" + hex(pc) + "  " + op + " " + rightPad(argString, 10) + "   =>", result);
+        console.log("$" + hex(pc) + "  " + op.toUpperCase() + " " + rightPad(argString, 10) + "   =>", result);
       }
 
       output = output.concat(result);
