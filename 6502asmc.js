@@ -178,7 +178,7 @@ function parse(op, mode, argument, labels, pc) {
 function runPass(program, labels, debug) {
   const lines = program.split("\n");
 
-  let pc = 0;
+  let pc = 0xc000;
   let foundLabels = {};
   let output = [];
 
