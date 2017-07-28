@@ -209,28 +209,28 @@ function runPass(program, labels, debug) {
 
     let match, mode;
 
-    if (match = line.match(/^(\w{3})$/i)) {
+    if (match = line.match(/^([a-z]{3})$/i)) {
       mode = 'implied';
     }
-    else if (match = line.match(/^(\w{3})\s+a$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+a$/i)) {
       mode = 'accumulator';
     }
-    else if (match = line.match(/^(\w{3})\s+#([0-9]+|\$[0-9a-f]+)$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+#([0-9]+|\$[0-9a-f]+)$/i)) {
       mode = 'immediate';
     }
-    else if (match = line.match(/^(\w{3})\s+([0-9]+|\$[0-9a-f]+|\w+)$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+)$/i)) {
       mode = 'absolute';
     }
-    else if (match = line.match(/^(\w{3})\s+([0-9]+|\$[0-9a-f]+|\w+),\s*([xy])$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+),\s*([xy])$/i)) {
       mode = 'absolute,' + match[3].toLowerCase();
     }
-    else if (match = line.match(/^(\w{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\)$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\)$/i)) {
       mode = 'indirect';
     }
-    else if (match = line.match(/^(\w{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+),\s*x\)$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+),\s*x\)$/i)) {
       mode = 'indirect,x';
     }
-    else if (match = line.match(/^(\w{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\),\s*y$/i)) {
+    else if (match = line.match(/^([a-z]{3})\s+\(([0-9]+|\$[0-9a-f]+|\w+)\),\s*y$/i)) {
       mode = 'indirect,y';
     }
 
