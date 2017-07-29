@@ -202,8 +202,9 @@ function parseLine(rawLine, pc, labels) {
 
   const pcSetMatch = line.match(/^\*\s*=\s*(\$?[0-9a-f]+)$/i);
   if (pcSetMatch) {
-    pc = parseNumber(pcSetMatch[1], 2, {});
-    return [pc];
+    const [type, value] = parseNumber(pcSetMatch[1], 2);
+    if (type !== 'number') { throw new Error("cannot use a label to set memory location"); }
+    return [value];
   }
 
   const labelMatch = line.match(/^([a-z_]\w*)\s*\:\s*(.*)/i);
@@ -280,7 +281,18 @@ function runFirstPass(program) {
     const result = parseLine(line, pc, labels);
     instructions.push(result);
 
-    pc += BRANCH_OPS.includes(result[1]) ? 2 : (MODE_BYTES[result[2]] || 0);
+    if (result[1] === undefined) {
+      pc = result[0];
+    }
+    else if (BRANCH_OPS.includes(result[1])) {
+      pc += 2;
+    }
+    else if (result[1] === 'data') {
+      pc += result[2].length;
+    }
+    else {
+      pc += MODE_BYTES[result[2]] || 0;
+    }
   }
 
   return {instructions, labels};

@@ -13,7 +13,7 @@ compile(`
 console.log("");
 
 compile(`
-  * = $c000
+  * = $c100
   LDX #10
   loop: TXA
   STA $0400, X
