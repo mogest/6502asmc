@@ -298,9 +298,9 @@ function parseLine(rawLine, pc, labels) {
     if (!line) { return [pc]; }
   }
 
-  const bytesMatch = line.match(/^(\.byte|\.word)\s+(.+)/);
+  const bytesMatch = line.match(/^\.(byte|db|word|dw)\s+(.+)/);
   if (bytesMatch) {
-    const fn = bytesMatch[1] === '.byte' ? parseBytes : parseWords;
+    const fn = bytesMatch[1].includes('b') ? parseBytes : parseWords;
     return [pc, "data", fn(bytesMatch[2])];
   }
 
