@@ -1,7 +1,7 @@
 const compile = require('./6502asmc');
 
 compile(`
-  * = $c000
+  * = $c100
   LDX #10
   loop: TXA
   STA $0400, X
@@ -13,7 +13,7 @@ compile(`
 console.log("");
 
 compile(`
-  * = $c100
+  org $c200
   LDX #10
   loop: TXA
   STA $0400, X

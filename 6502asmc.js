@@ -195,14 +195,18 @@ function parse(op, mode, argument, pc) {
   }
 }
 
+function parseBytes(data) {
+
+}
+
 function parseLine(rawLine, pc, labels) {
   let line = rawLine.replace(/;.*$/, '').replace(/^\s+|\s+$/g, '');
 
   if (!line) { return [pc]; }
 
-  const pcSetMatch = line.match(/^\*\s*=\s*(\$?[0-9a-f]+)$/i);
+  const pcSetMatch = line.match(/^(org\s|\*\s*=)\s*(\$?[0-9a-f]+)$/i);
   if (pcSetMatch) {
-    const [type, value] = parseNumber(pcSetMatch[1], 2);
+    const [type, value] = parseNumber(pcSetMatch[2], 2);
     if (type !== 'number') { throw new Error("cannot use a label to set memory location"); }
     return [value];
   }
