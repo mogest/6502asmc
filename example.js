@@ -36,5 +36,7 @@ loop:
 done:
   rts
 
-  text: .byte "HE SAID, \\"HELLO, WORLD\\".", 0
+text:
+  .byte "HE SAID, \\"HELLO, WORLD\\".", 0
+  .word $abcd, 30
 `, true);

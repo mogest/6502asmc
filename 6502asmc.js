@@ -247,6 +247,22 @@ function parseBytes(data) {
   return output;
 }
 
+function parseWords(data) {
+  let output = [];
+
+  for (const word of data.split(",")) {
+    const strippedWord = word.replace(/\s/, '');
+    if (strippedWord !== '') {
+      const [type, value] = parseNumber(strippedWord, 2);
+      if (type !== 'number') { throw new Error(`${strippedWord} is not a number`); }
+      output.push(value & 0xff);
+      output.push(value >> 8);
+    }
+  }
+
+  return output;
+}
+
 function parseLine(rawLine, pc, labels) {
   let line = rawLine.replace(/;.*$/, '').replace(/^\s+|\s+$/g, '');
 
@@ -274,9 +290,10 @@ function parseLine(rawLine, pc, labels) {
     if (!line) { return [pc]; }
   }
 
-  const bytesMatch = line.match(/^\.byte\s+(.+)/);
+  const bytesMatch = line.match(/^(\.byte|\.word)\s+(.+)/);
   if (bytesMatch) {
-    return [pc, "data", parseBytes(bytesMatch[1])];
+    const fn = bytesMatch[1] === '.byte' ? parseBytes : parseWords;
+    return [pc, "data", fn(bytesMatch[2])];
   }
 
   let match, mode;
