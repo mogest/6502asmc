@@ -26,6 +26,8 @@ compile(`
 console.log("");
 
 compile(`
+  lda #'!'
+  jsr $ffd2
   ldx #0
 loop:
   lda text, x

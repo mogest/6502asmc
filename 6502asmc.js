@@ -104,6 +104,16 @@ function rightPad(string, count) {
   return string;
 }
 
+const CHARACTER_SET = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[@]@@ !\"#$%&'()*+,-./0123456789:;<=>?";
+
+function asciiToC64(character) {
+  const index = CHARACTER_SET.indexOf(character);
+  if (index === -1) {
+    throw new Error(`cannot find character "${character}" in the C64 character set 1`);
+  }
+  return index;
+}
+
 function formatValue(op, mode, value) {
   switch (mode) {
     case "implied":      return "";
@@ -132,6 +142,9 @@ function parseNumber(value, bytes) {
   }
   else if (value.match(/^[0-9]+$/)) {
     number = parseInt(value, 10);
+  }
+  else if (match = value.match(/^'(.)'$/)) {
+    return ["number", asciiToC64(match[1])];
   }
   else if (value.match(/^[a-z_]\w*$/i)) {
     return ["label", value];
@@ -201,8 +214,6 @@ function parse(op, mode, argument, pc) {
   }
 }
 
-const CHARACTER_SET = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[@]@@ !\"#$%&'()*+,-./0123456789:;<=>?";
-
 function parseBytes(data) {
   let inQuote = false, inEscape = false;
   let buffer = "";
@@ -230,11 +241,8 @@ function parseBytes(data) {
     else {
       if (inQuote) {
         inEscape = false;
-        const index = CHARACTER_SET.indexOf(c);
-        if (index === -1) {
-          throw new Error(`cannot find character "${c}" in the C64 character set 1`);
-        }
-        output = output.concat(index);
+        const code = asciiToC64(c);
+        output = output.concat(code);
       }
       else {
         buffer += c;
@@ -304,7 +312,7 @@ function parseLine(rawLine, pc, labels) {
   else if (match = line.match(/^([a-z]{3})\s+a$/i)) {
     mode = 'accumulator';
   }
-  else if (match = line.match(/^([a-z]{3})\s+#([0-9]+|\$[0-9a-f]+)$/i)) {
+  else if (match = line.match(/^([a-z]{3})\s+#([0-9]+|\$[0-9a-f]+|'.')$/i)) {
     mode = 'immediate';
   }
   else if (match = line.match(/^([a-z]{3})\s+([0-9]+|\$[0-9a-f]+|\w+)$/i)) {
