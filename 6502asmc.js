@@ -196,7 +196,7 @@ function parse(op, mode, argument, pc) {
 }
 
 function parseLine(rawLine, pc, labels) {
-  let line = rawLine.replace(/^\s+|\s+$/g, '');
+  let line = rawLine.replace(/;.*$/, '').replace(/^\s+|\s+$/g, '');
 
   if (!line) { return [pc]; }
 
