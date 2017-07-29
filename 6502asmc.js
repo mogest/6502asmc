@@ -206,7 +206,7 @@ function parseLine(rawLine, pc, labels) {
     return [pc];
   }
 
-  const labelMatch = line.match(/^([a-z_]\w*)\s*\:\s*(.+)/i);
+  const labelMatch = line.match(/^([a-z_]\w*)\s*\:\s*(.*)/i);
 
   if (labelMatch) {
     const name = labelMatch[1];
@@ -218,6 +218,7 @@ function parseLine(rawLine, pc, labels) {
     }
     labels[name] = pc;
     line = labelMatch[2];
+    if (!line) { return [pc]; }
   }
 
   let match, mode;
