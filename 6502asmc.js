@@ -119,6 +119,8 @@ function formatValue(op, mode, value) {
     case "indirect,x":   return "($" + hex(value, 4) + ", X)";
     case "indirect,y":   return "($" + hex(value, 4) + "), Y";
   }
+
+  return '';
 }
 
 function parseNumber(value, bytes) {
@@ -150,6 +152,10 @@ function parseNumber(value, bytes) {
 }
 
 function parse(op, mode, argument, pc) {
+  if (op === "data") {
+    return mode;
+  }
+
   const opValues = OPS[op.toUpperCase()];
   if (opValues === undefined) {
     throw new Error(`unknown op ${op}`);
@@ -195,8 +201,50 @@ function parse(op, mode, argument, pc) {
   }
 }
 
-function parseBytes(data) {
+const CHARACTER_SET = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[@]@@ !\"#$%&'()*+,-./0123456789:;<=>?";
 
+function parseBytes(data) {
+  let inQuote = false, inEscape = false;
+  let buffer = "";
+  let output = [];
+
+  data += ",";
+
+  for (const c of data.split("")) {
+    if (!inQuote && (c === ' ' || c === '\t')) {
+    }
+    else if (c === '"' && !inEscape) {
+      inQuote = !inQuote;
+    }
+    else if (c === '\\' && inQuote && !inEscape) {
+      inEscape = true;
+    }
+    else if (!inQuote && c === ',') {
+      if (buffer !== '') {
+        const [type, value] = parseNumber(buffer, 1);
+        if (type !== 'number') { throw new Error(`${buffer} is not a number`); }
+        output = output.concat(value);
+        buffer = '';
+      }
+    }
+    else {
+      if (inQuote) {
+        inEscape = false;
+        const index = CHARACTER_SET.indexOf(c);
+        if (index === -1) {
+          throw new Error(`cannot find character "${c}" in the C64 character set 1`);
+        }
+        output = output.concat(index);
+      }
+      else {
+        buffer += c;
+      }
+    }
+  }
+
+  if (inQuote) { throw new Error("unterminated quote in byte string"); }
+
+  return output;
 }
 
 function parseLine(rawLine, pc, labels) {
@@ -224,6 +272,11 @@ function parseLine(rawLine, pc, labels) {
     labels[name] = pc;
     line = labelMatch[2];
     if (!line) { return [pc]; }
+  }
+
+  const bytesMatch = line.match(/^\.byte\s+(.+)/);
+  if (bytesMatch) {
+    return [pc, "data", parseBytes(bytesMatch[1])];
   }
 
   let match, mode;
@@ -329,7 +382,7 @@ function runSecondPass({instructions, labels}, debug) {
 
       if (debug) {
         let argString = formatValue(op, mode, value);
-        console.log("$" + hex(pc) + "  " + op.toUpperCase() + " " + rightPad(argString, 10) + "   =>", result);
+        console.log("$" + hex(pc) + "  " + rightPad(op.toUpperCase(), 4) + rightPad(argString, 10) + "   =>", result.map(n => hex(n, 2)).join(" "));
       }
 
       output = output.concat(result);

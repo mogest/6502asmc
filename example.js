@@ -22,3 +22,19 @@ compile(`
   JMP loop
   end: RTS
 `, true);
+
+console.log("");
+
+compile(`
+  ldx #0
+loop:
+  lda text, x
+  beq done
+  jsr $ffd2
+  inx
+  jmp loop
+done:
+  rts
+
+  text: .byte "HE SAID, \\"HELLO, WORLD\\".", 0
+`, true);
